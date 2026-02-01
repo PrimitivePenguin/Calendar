@@ -234,7 +234,7 @@ function YearView() {
             <h3 className={`text-sm font-semibold mb-2 ${isCurrentMonth ? 'text-blue-600' : 'text-gray-700'}`}>
               {monthName}
             </h3>
-            <div className="grid grid-cols-7 gap-px text-xs">
+            <div className="grid grid-cols-7 gap-px text-xs h-full">
               {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
                 <div key={i} className="text-center text-gray-400 font-medium">
                   {d}
@@ -372,6 +372,11 @@ function NavigationButtons() {
       </button>
     </div>
   );
+}
+
+function dayClickHandler(date: Temporal.PlainDate) {
+    console.log("Clicked date:", date.toString());
+    // When month or year, if clicked, displays popup to show event of that date (empty, update)
 }
 
 export { Calendar, RecallButton, ViewToggle, NavigationButtons };
