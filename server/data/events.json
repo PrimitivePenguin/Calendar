@@ -1,0 +1,13 @@
+[
+  {
+    "id": "96628792-687b-4fdb-b2a7-fd7a7d95e940",
+    "title": "Team Meeting",
+    "description": "Weekly sync",
+    "startDate": "2026-02-05T10:00:00Z",
+    "endDate": "2026-02-05T11:00:00Z",
+    "allDay": false,
+    "color": "#3788d8",
+    "createdAt": "2026-02-01T13:41:07.041Z",
+    "updatedAt": "2026-02-01T13:41:07.041Z"
+  }
+]
