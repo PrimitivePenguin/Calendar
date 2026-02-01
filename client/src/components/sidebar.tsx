@@ -1,5 +1,6 @@
 import { Box, ChevronDown, Calendar, MessageSquare, User, Wrench } from 'lucide-react';
 import { useState } from 'react';
+import { useCalendar } from '../context/calendarcontext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -8,9 +9,22 @@ interface SidebarProps {
 
 const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
   const [activeDropdown, setActiveDropdown] = useState('');
+  const { setView, goToToday } = useCalendar();
+
+  const handleCalendarViewChange = (viewType: string) => {
+    const view = viewType.toLowerCase() as 'day' | 'week' | 'month' | 'year';
+    setView(view);
+    goToToday(); // Reset to today when changing view from sidebar
+  };
 
   const navItems = [
-    { title: 'Calendar', icon: Calendar, hasDropdown: true, dropdownItems: ['Day', 'Week', 'Month', 'Year'] },
+    { 
+      title: 'Calendar', 
+      icon: Calendar, 
+      hasDropdown: true, 
+      dropdownItems: ['Day', 'Week', 'Month', 'Year'],
+      onDropdownClick: handleCalendarViewChange
+    },
     { 
       title: 'Weekly Goal', 
       icon: User,
@@ -33,7 +47,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
 
   return (
     <div 
-      className={`bg-white text-black border-r-2 border-[rgba(0,0,0,0.08)] h-full overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'opacity-50' : 'opacity-0'}`}
+      className={`bg-white text-black border-r-2 border-[rgba(0,0,0,0.08)] h-full overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'opacity-100' : 'opacity-0'}`}
     >
       <div className="p-6">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
@@ -73,6 +87,11 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                   <button
                     key={dropdownItem}
                     className="w-full px-12 py-2 hover:bg-[#F3F5F7] rounded-lg cursor-pointer text-sm text-gray-600 text-left transition-colors"
+                    onClick={() => {
+                      if (item.onDropdownClick) {
+                        item.onDropdownClick(dropdownItem);
+                      }
+                    }}
                   >
                     {dropdownItem}
                   </button>

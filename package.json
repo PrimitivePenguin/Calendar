@@ -6,5 +6,8 @@
     "client": "cd client && npm run start",
     "server": "cd server && npm run dev",
     "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
+  "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1"
   }
 }
