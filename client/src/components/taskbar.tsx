@@ -8,7 +8,7 @@ interface TaskbarProps {
 
 const Taskbar = ({ isOpen, setIsOpen }: TaskbarProps) => {
   return (
-    <div className="bg-white text-black text-sm border-b-2 border-[rgba(0,0,0,0.08)] px-6 py-3">
+    <div className="bg-gray text-black text-sm border-b-2 border-[rgba(0,0,0,0.08)] px-6 py-3">
       <div className="flex items-center justify-between">
         {/* Left section: Menu, Title, Navigation */}
         <div className="flex items-center gap-3">
@@ -21,7 +21,7 @@ const Taskbar = ({ isOpen, setIsOpen }: TaskbarProps) => {
           </button>
           
           <h1 className="font-bold text-lg text-[#3B40E8]">
-            Calendar
+            Ad Astra
           </h1>
           
           {/* Navigation buttons (prev/next) */}

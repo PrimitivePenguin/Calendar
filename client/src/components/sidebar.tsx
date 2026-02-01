@@ -44,7 +44,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
       title: 'To-Do List', 
       icon: MessageSquare,
       hasDropdown: true,
-      dropdownItems: ['Inbox', 'Sent', 'Drafts', 'Archived']
+      dropdownItems: ['To be', 'Worked', 'On in the', 'Future']
     },
     { title: 'Analytics', icon: Box, hasDropdown: false },
     {

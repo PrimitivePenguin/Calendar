@@ -401,7 +401,7 @@ function RecallButton() {
       default: return `${monthNames[displayedDate.month]} ${displayedDate.year}`;
     }
   };
-  return <button className="display-readout text-sm tracking-wider" onClick={goToToday}>{getDisplayValue()}</button>;
+  return <button className="display-readout text-sm  tracking-wider hover:bg-gray" onClick={goToToday}>{getDisplayValue()}</button>;
 }
 
 // View Toggle
