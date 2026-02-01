@@ -49,3 +49,4 @@ const Taskbar = ({ isOpen, setIsOpen }: TaskbarProps) => {
 };
 
 export default Taskbar;
+

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import Sidebar from './components/sidebar';
 import MainContent from './components/maincontent'
 import Taskbar from './components/taskbar';
+import EventModal from './components/eventmodal';
+import TaskModal from './components/taskmodal';
 import { CalendarProvider } from './context/calendarcontext';
 import './global.css'
 
@@ -31,6 +33,10 @@ function App() {
           </div>
         </div>
       </div>
+      
+      {/* Modals */}
+      <EventModal />
+      <TaskModal />
     </CalendarProvider>
   ) 
 }

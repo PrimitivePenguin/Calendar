@@ -9,5 +9,27 @@
     "color": "#3788d8",
     "createdAt": "2026-02-01T13:41:07.041Z",
     "updatedAt": "2026-02-01T13:41:07.041Z"
+  },
+  {
+    "id": "33b33a91-9194-4d21-8b37-0d9e3072ed0a",
+    "title": "Hackathon ends",
+    "description": "I'm free of my suffering\n",
+    "startDate": "2026-02-01T14:00:00.000Z",
+    "endDate": "2026-02-01T20:00:00.000Z",
+    "allDay": false,
+    "color": "#3788d8",
+    "createdAt": "2026-02-01T14:06:23.240Z",
+    "updatedAt": "2026-02-01T14:06:23.240Z"
+  },
+  {
+    "id": "2db27198-a418-47b0-98f8-1aa1038aad74",
+    "title": "sleep? Please??",
+    "description": "",
+    "startDate": "2026-02-01T17:00:00.000Z",
+    "endDate": "2026-02-01T18:00:00.000Z",
+    "allDay": false,
+    "color": "#ffd93d",
+    "createdAt": "2026-02-01T14:24:40.654Z",
+    "updatedAt": "2026-02-01T14:24:40.654Z"
   }
 ]
