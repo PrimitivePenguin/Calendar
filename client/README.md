@@ -1,23 +1,21 @@
-Calendar
-1. Setup MERN stack (2-6:30pm)
-2. Basic UI Framework
-3. Setup Backend
-4. Setup Frontend
-5. Rejoice
-6. Profit
-7. Do other assignments
+Installation:
 
-# Main component
-TaskBar Layer
-  ├─ SearchBar component
-  └─ ViewModeSelector component
+    run "npm -i" in client folder
+    run "npm -i" in server folder
+    run "npm run dev" in root to start react
 
-SideBar Layer
-  ├─ MiniCalendar component
-  ├─ WeeklyGoals component
-  └─ HoursLogger component
+Features done: To do list
 
-MainScreen Layer
-  ├─ Calendar views (Day/Week/Month/Year)
-  ├─ TodoList component
-  └─ EventModal component
+    Can add / edit / remove tasks
+    Can add / edit / remove events Display
+    Switch between Day / Week / Month / Year Display
+    Light (Classic) mode, Dark (Into the Future) - Accessed through "settings" in sidebar
+    Scroll through different days / weeks / months / years with the buttons at top left
+    Click on the month (i.e. February 2026) to go back to whenever today is
+
+Features that does not work:
+
+    Weekly goals
+    To-do list side bar
+    Search function
+
