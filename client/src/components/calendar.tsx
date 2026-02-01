@@ -2,26 +2,24 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Temporal } from "@js-temporal/polyfill";
 import { useCalendar, CalendarEvent, Task } from '../context/calendarcontext';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 // Helper to get week start (Monday)
 function getWeekStart(date: Temporal.PlainDate): Temporal.PlainDate {
-  const dayOfWeek = date.dayOfWeek; // 1 = Monday, 7 = Sunday
+  const dayOfWeek = date.dayOfWeek;
   return date.subtract({ days: dayOfWeek - 1 });
 }
 
-// Helper to calculate event position and dimensions
 interface PositionedEvent extends CalendarEvent {
-  top: number;      // pixels from top of day
-  height: number;   // height in pixels
-  left: number;     // percentage from left (0-100)
-  width: number;    // percentage width
-  column: number;   // which column this event is in
+  top: number;
+  height: number;
+  left: number;
+  width: number;
+  column: number;
 }
 
 function getEventPositions(events: CalendarEvent[], date: Temporal.PlainDate, hourHeight: number = 60): PositionedEvent[] {
   const dateStr = date.toString();
-  
-  // Filter events that occur on this date
   const dayEvents = events.filter(event => {
     const startDate = event.startDate.slice(0, 10);
     const endDate = event.endDate.slice(0, 10);
@@ -30,267 +28,151 @@ function getEventPositions(events: CalendarEvent[], date: Temporal.PlainDate, ho
 
   if (dayEvents.length === 0) return [];
 
-  // Calculate position for each event
   const positioned: PositionedEvent[] = dayEvents.map(event => {
     const eventStart = new Date(event.startDate);
     const eventEnd = new Date(event.endDate);
     const dayStart = new Date(`${dateStr}T00:00:00`);
     const dayEnd = new Date(`${dateStr}T23:59:59`);
-
-    // Clamp to current day
     const displayStart = eventStart < dayStart ? dayStart : eventStart;
     const displayEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
-
     const startHour = displayStart.getHours() + displayStart.getMinutes() / 60;
-    const endHour = displayEnd.getHours() + displayEnd.getMinutes() / 60 + (displayEnd > dayEnd ? 0 : 0);
-    
-    // If event ends at midnight or spans to next day, show until end of day
+    const endHour = displayEnd.getHours() + displayEnd.getMinutes() / 60;
     const effectiveEndHour = eventEnd > dayEnd ? 24 : endHour;
-
     const top = startHour * hourHeight;
-    const height = Math.max((effectiveEndHour - startHour) * hourHeight, hourHeight / 2); // minimum height
-
-    return {
-      ...event,
-      top,
-      height,
-      left: 0,
-      width: 100,
-      column: 0,
-    };
+    const height = Math.max((effectiveEndHour - startHour) * hourHeight, hourHeight / 2);
+    return { ...event, top, height, left: 0, width: 100, column: 0 };
   });
 
-  // Sort by start time, then by duration (longer first)
-  positioned.sort((a, b) => {
-    if (a.top !== b.top) return a.top - b.top;
-    return b.height - a.height;
-  });
-
-  // Find overlapping events and assign columns
+  positioned.sort((a, b) => a.top !== b.top ? a.top - b.top : b.height - a.height);
   const columns: PositionedEvent[][] = [];
-
+  
   positioned.forEach(event => {
-    // Find a column where this event doesn't overlap
     let placed = false;
     for (let i = 0; i < columns.length; i++) {
-      const column = columns[i];
-      const overlaps = column.some(other => {
+      const overlaps = columns[i].some(other => {
         const otherEnd = other.top + other.height;
         const eventEnd = event.top + event.height;
         return !(event.top >= otherEnd || eventEnd <= other.top);
       });
-
       if (!overlaps) {
-        column.push(event);
+        columns[i].push(event);
         event.column = i;
         placed = true;
         break;
       }
     }
-
     if (!placed) {
       columns.push([event]);
       event.column = columns.length - 1;
     }
   });
 
-  // Calculate width and left position based on columns
   const totalColumns = columns.length;
   positioned.forEach(event => {
     event.width = 100 / totalColumns;
     event.left = event.column * event.width;
   });
-
   return positioned;
 }
 
+// Reusable popup component
+function CreatePopup({ isOpen, position, onClose, onCreateEvent, onCreateTask }: {
+  isOpen: boolean;
+  position: { x: number; y: number };
+  onClose: () => void;
+  onCreateEvent: () => void;
+  onCreateTask: () => void;
+}) {
+  if (!isOpen) return null;
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div
+        className="dropdown-retro fixed z-50 min-w-[160px] py-2"
+        style={{ left: position.x, top: position.y }}
+      >
+        <button onClick={onCreateEvent} className="dropdown-item w-full text-left text-sm">
+          <div className="status-light status-blue status-light-on" />
+          <span className="font-body">New Event</span>
+        </button>
+        <div className="dropdown-divider" />
+        <button onClick={onCreateTask} className="dropdown-item w-full text-left text-sm">
+          <div className="status-light status-green status-light-on" />
+          <span className="font-body">New Task</span>
+        </button>
+      </div>
+    </>
+  );
+}
 
-// Day View Component
+// Day View
 function DayView() {
-  const {
-    displayedDate,
-    events,
-    tasks,
-    setIsEventModalOpen,
-    setIsTaskModalOpen,
-    setEditingEvent,
-    setEditingTask,
-    setSelectedDate,
-  } = useCalendar();
+  const { displayedDate, events, tasks, setIsEventModalOpen, setIsTaskModalOpen, setEditingEvent, setEditingTask, setSelectedDate } = useCalendar();
   const hours = Array.from({ length: 24 }, (_, i) => i);
-  const hourHeight = 60; // pixels per hour
-
-  // Popup state
+  const hourHeight = 60;
   const [popupOpen, setPopupOpen] = useState(false);
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
   const [popupDate, setPopupDate] = useState('');
 
-  const formatHour = (hour: number) => {
-    if (hour === 0) return '12 AM';
-    if (hour === 12) return '12 PM';
-    return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
-  };
-
+  const formatHour = (hour: number) => hour.toString().padStart(2, '0') + ':00';
   const isToday = displayedDate.equals(Temporal.Now.plainDateISO());
+  const positionedEvents = useMemo(() => getEventPositions(events, displayedDate, hourHeight), [events, displayedDate]);
+  const dayTasks = tasks.filter(task => task.dueDate.slice(0, 10) === displayedDate.toString());
+  const getEventHour = (dateStr: string) => new Date(dateStr).getHours();
 
-  // Get positioned events for this day
-  const positionedEvents = useMemo(() => {
-    return getEventPositions(events, displayedDate, hourHeight);
-  }, [events, displayedDate]);
-
-  // Get tasks for the displayed date
-  const dayTasks = tasks.filter(task => {
-    const taskDate = task.dueDate.slice(0, 10);
-    return taskDate === displayedDate.toString();
-  });
-
-  // Get hour from ISO date string
-  const getEventHour = (dateStr: string) => {
-    return new Date(dateStr).getHours();
-  };
-
-  // Click on hour slot to show popup
   const handleHourClick = (hour: number, e: React.MouseEvent) => {
-    const hourStr = hour.toString().padStart(2, '0');
-    setPopupDate(`${displayedDate.toString()}T${hourStr}:00`);
+    setPopupDate(`${displayedDate.toString()}T${hour.toString().padStart(2, '0')}:00`);
     setPopupPosition({ x: e.clientX, y: e.clientY });
     setPopupOpen(true);
   };
 
-  const handleCreateEvent = () => {
-    setSelectedDate(popupDate);
-    setEditingEvent(null);
-    setIsEventModalOpen(true);
-    setPopupOpen(false);
-  };
-
-  const handleCreateTask = () => {
-    setSelectedDate(popupDate);
-    setEditingTask(null);
-    setIsTaskModalOpen(true);
-    setPopupOpen(false);
-  };
-
-  // Click on event to edit
-  const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingEvent(event);
-    setIsEventModalOpen(true);
-  };
-
-  // Click on task to edit
-  const handleTaskClick = (task: Task, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingTask(task);
-    setIsTaskModalOpen(true);
-  };
-
   return (
-    <div className="flex flex-col h-full">
-      {/* Popup for choosing event or task */}
-      {popupOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setPopupOpen(false)} />
-          <div
-            className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[140px]"
-            style={{ left: popupPosition.x, top: popupPosition.y }}
-          >
-            <button
-              onClick={handleCreateEvent}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2"
-            >
-              <span className="w-3 h-3 rounded-full bg-blue-500" />
-              New Event
-            </button>
-            <button
-              onClick={handleCreateTask}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-green-50 flex items-center gap-2"
-            >
-              <span className="w-3 h-3 rounded-full bg-green-500" />
-              New Task
-            </button>
-          </div>
-        </>
-      )}
-
-      {/* Day header */}
-      <div className="flex border-b border-gray-200 bg-gray-50 sticky top-0 z-10">
-        <div className="w-20 flex-shrink-0" /> {/* Time gutter */}
-        <div className="flex-1 py-3 text-center">
-          <div className="text-sm text-gray-500">
-            {displayedDate.toLocaleString('en', { weekday: 'long' })}
-          </div>
-          <div className={`text-2xl font-semibold ${isToday ? 'bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center mx-auto' : ''}`}>
+    <div className="flex flex-col h-full bg-theme-secondary">
+      <CreatePopup isOpen={popupOpen} position={popupPosition} onClose={() => setPopupOpen(false)}
+        onCreateEvent={() => { setSelectedDate(popupDate); setEditingEvent(null); setIsEventModalOpen(true); setPopupOpen(false); }}
+        onCreateTask={() => { setSelectedDate(popupDate); setEditingTask(null); setIsTaskModalOpen(true); setPopupOpen(false); }}
+      />
+      <div className="view-header flex items-center border-b-4 border-gray-700 sticky top-0 z-10">
+        <div className="w-20 flex-shrink-0" />
+        <div className="flex-1 py-4 text-center">
+          <div className="view-header-day text-sm">{displayedDate.toLocaleString('en', { weekday: 'long' })}</div>
+          <div className={`inline-flex items-center justify-center mt-1 ${isToday ? 'day-badge day-badge-today text-2xl' : 'text-2xl font-display font-bold text-gray-300'}`}>
             {displayedDate.day}
           </div>
         </div>
       </div>
-      
-      {/* Hour grid */}
       <div className="flex-1 overflow-y-auto">
         <div className="flex">
-          {/* Time gutter */}
-          <div className="w-20 flex-shrink-0">
+          <div className="time-gutter w-20 flex-shrink-0">
             {hours.map((hour) => (
-              <div key={hour} className="h-[60px] text-right pr-3 py-2 text-sm text-gray-500 bg-gray-50 border-b border-gray-100">
-                {formatHour(hour)}
+              <div key={hour} className="relative h-[60px] pr-4">
+                <span className="time-label block pt-1">{formatHour(hour)}</span>
+                <span className="time-tick time-tick-major absolute right-0 top-0" />
+                <span className="time-tick time-tick-minor absolute right-0 top-[15px]" />
+                <span className="time-tick time-tick-minor absolute right-0 top-[30px]" />
+                <span className="time-tick time-tick-minor absolute right-0 top-[45px]" />
               </div>
             ))}
           </div>
-          
-          {/* Events column */}
-          <div className="flex-1 relative border-l border-gray-200">
-            {/* Hour grid lines */}
+          <div className="flex-1 relative border-l-4 border-gray-400">
             {hours.map((hour) => {
               const hourTasks = dayTasks.filter(t => getEventHour(t.dueDate) === hour);
               return (
-                <div 
-                  key={hour} 
-                  onClick={(e) => handleHourClick(hour, e)}
-                  className="h-[60px] border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer"
-                >
-                  {/* Tasks at this hour (not positioned like events) */}
+                <div key={hour} onClick={(e) => handleHourClick(hour, e)} className="h-[60px] border-b-2 border-gray-300 bg-theme-secondary hover:bg-theme-tertiary transition-colors cursor-pointer">
                   {hourTasks.map(task => (
-                    <div
-                      key={task.id}
-                      onClick={(e) => handleTaskClick(task, e)}
-                      className={`text-xs px-2 py-1 mx-1 rounded mb-1 truncate border-l-2 bg-gray-100 cursor-pointer hover:bg-gray-200 ${
-                        task.completed ? 'line-through text-gray-400' : 'text-gray-700'
-                      } ${
-                        task.priority === 'high' ? 'border-red-500' :
-                        task.priority === 'medium' ? 'border-yellow-500' : 'border-green-500'
-                      }`}
-                    >
-                      {task.title}
+                    <div key={task.id} onClick={(e) => { e.stopPropagation(); setEditingTask(task); setIsTaskModalOpen(true); }}
+                      className="task-item mx-2 my-1 cursor-pointer" style={{ borderLeftColor: task.priority === 'high' ? 'var(--accent-red)' : task.priority === 'medium' ? 'var(--accent-yellow)' : 'var(--accent-green)' }}>
+                      <span className={task.completed ? 'line-through opacity-50' : ''}>{task.title}</span>
                     </div>
                   ))}
                 </div>
               );
             })}
-            
-            {/* Positioned events overlay */}
             {positionedEvents.map(event => (
-              <div
-                key={event.id}
-                onClick={(e) => handleEventClick(event, e)}
-                className="absolute text-xs px-2 py-1 rounded text-white cursor-pointer hover:opacity-90 overflow-hidden border-l-2 border-white/30"
-                style={{
-                  backgroundColor: event.color,
-                  top: `${event.top}px`,
-                  height: `${event.height}px`,
-                  left: `${event.left}%`,
-                  width: `calc(${event.width}% - 4px)`,
-                  marginLeft: '2px',
-                }}
-              >
-                <div className="font-medium truncate">{event.title}</div>
-                {event.height > 40 && (
-                  <div className="text-xs opacity-80 truncate">
-                    {new Date(event.startDate).toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })}
-                    {' - '}
-                    {new Date(event.endDate).toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })}
-                  </div>
-                )}
+              <div key={event.id} onClick={(e) => { e.stopPropagation(); setEditingEvent(event); setIsEventModalOpen(true); }}
+                className="event-block absolute text-white cursor-pointer" style={{ backgroundColor: event.color, top: `${event.top}px`, height: `${event.height}px`, left: `${event.left}%`, width: `calc(${event.width}% - 8px)`, marginLeft: '4px', padding: '6px 10px' }}>
+                <div className="font-medium truncate text-xs">{event.title}</div>
+                {event.height > 40 && <div className="text-[10px] opacity-80 truncate mt-1">{new Date(event.startDate).toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })} → {new Date(event.endDate).toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })}</div>}
               </div>
             ))}
           </div>
@@ -300,207 +182,81 @@ function DayView() {
   );
 }
 
-// Week View Component
+// Week View
 function WeekView() {
-  const {
-    displayedDate,
-    events,
-    tasks,
-    setIsEventModalOpen,
-    setIsTaskModalOpen,
-    setEditingEvent,
-    setEditingTask,
-    setSelectedDate,
-  } = useCalendar();
+  const { displayedDate, events, tasks, setIsEventModalOpen, setIsTaskModalOpen, setEditingEvent, setEditingTask, setSelectedDate } = useCalendar();
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const weekStart = getWeekStart(displayedDate);
   const days = Array.from({ length: 7 }, (_, i) => weekStart.add({ days: i }));
   const today = Temporal.Now.plainDateISO();
-  const hourHeight = 50; // pixels per hour
-
-  // Popup state
+  const hourHeight = 50;
   const [popupOpen, setPopupOpen] = useState(false);
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
   const [popupDate, setPopupDate] = useState('');
 
-  const formatHour = (hour: number) => {
-    if (hour === 0) return '12 AM';
-    if (hour === 12) return '12 PM';
-    return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
-  };
-
-  // Get positioned events for each day
+  const formatHour = (hour: number) => hour.toString().padStart(2, '0') + ':00';
   const positionedEventsByDay = useMemo(() => {
     const result: { [key: string]: PositionedEvent[] } = {};
-    days.forEach(day => {
-      result[day.toString()] = getEventPositions(events, day, hourHeight);
-    });
+    days.forEach(day => { result[day.toString()] = getEventPositions(events, day, hourHeight); });
     return result;
-  }, [events, days.map(d => d.toString()).join(',')]);
+  }, [events, weekStart.toString()]);
 
-  // Get tasks for a specific date
-  const getTasksForDate = (date: Temporal.PlainDate) => {
-    return tasks.filter(task => {
-      const taskDate = task.dueDate.slice(0, 10);
-      return taskDate === date.toString();
-    });
-  };
-
-  // Get hour from ISO date string
-  const getEventHour = (dateStr: string) => {
-    return new Date(dateStr).getHours();
-  };
-
-  // Click on time slot to show popup
-  const handleSlotClick = (date: Temporal.PlainDate, hour: number, e: React.MouseEvent) => {
-    const hourStr = hour.toString().padStart(2, '0');
-    setPopupDate(`${date.toString()}T${hourStr}:00`);
-    setPopupPosition({ x: e.clientX, y: e.clientY });
-    setPopupOpen(true);
-  };
-
-  const handleCreateEvent = () => {
-    setSelectedDate(popupDate);
-    setEditingEvent(null);
-    setIsEventModalOpen(true);
-    setPopupOpen(false);
-  };
-
-  const handleCreateTask = () => {
-    setSelectedDate(popupDate);
-    setEditingTask(null);
-    setIsTaskModalOpen(true);
-    setPopupOpen(false);
-  };
-
-  // Click on event to edit
-  const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingEvent(event);
-    setIsEventModalOpen(true);
-  };
-
-  // Click on task to edit
-  const handleTaskClick = (task: Task, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingTask(task);
-    setIsTaskModalOpen(true);
-  };
+  const getTasksForDate = (date: Temporal.PlainDate) => tasks.filter(task => task.dueDate.slice(0, 10) === date.toString());
+  const getEventHour = (dateStr: string) => new Date(dateStr).getHours();
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Popup for choosing event or task */}
-      {popupOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setPopupOpen(false)} />
-          <div
-            className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[140px]"
-            style={{ left: popupPosition.x, top: popupPosition.y }}
-          >
-            <button
-              onClick={handleCreateEvent}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2"
-            >
-              <span className="w-3 h-3 rounded-full bg-blue-500" />
-              New Event
-            </button>
-            <button
-              onClick={handleCreateTask}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-green-50 flex items-center gap-2"
-            >
-              <span className="w-3 h-3 rounded-full bg-green-500" />
-              New Task
-            </button>
-          </div>
-        </>
-      )}
-
-      {/* Week header */}
-      <div className="flex border-b border-gray-200 bg-gray-50 sticky top-0 z-10">
-        <div className="w-20 flex-shrink-0" /> {/* Time gutter */}
+    <div className="flex flex-col h-full bg-theme-secondary">
+      <CreatePopup isOpen={popupOpen} position={popupPosition} onClose={() => setPopupOpen(false)}
+        onCreateEvent={() => { setSelectedDate(popupDate); setEditingEvent(null); setIsEventModalOpen(true); setPopupOpen(false); }}
+        onCreateTask={() => { setSelectedDate(popupDate); setEditingTask(null); setIsTaskModalOpen(true); setPopupOpen(false); }}
+      />
+      <div className="view-header flex border-b-4 border-gray-700 sticky top-0 z-10">
+        <div className="w-16 flex-shrink-0" />
         {days.map((day, index) => {
-          const isToday = day.equals(today);
+          const isDayToday = day.equals(today);
           return (
-            <div key={index} className="flex-1 py-2 text-center border-l border-gray-200">
-              <div className="text-xs text-gray-500">
-                {day.toLocaleString('en', { weekday: 'short' })}
-              </div>
-              <div className={`text-lg font-semibold ${isToday ? 'bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto' : ''}`}>
-                {day.day}
-              </div>
+            <div key={index} className="flex-1 py-3 text-center border-l-2 border-gray-600">
+              <div className="view-header-day text-xs">{day.toLocaleString('en', { weekday: 'short' }).toUpperCase()}</div>
+              <div className={`inline-flex items-center justify-center mt-1 ${isDayToday ? 'day-badge day-badge-today w-8 h-8 text-base' : 'text-lg font-display font-bold text-gray-300'}`}>{day.day}</div>
             </div>
           );
         })}
       </div>
-      
-      {/* Hour grid */}
       <div className="flex-1 overflow-y-auto">
         <div className="flex">
-          {/* Time gutter */}
-          <div className="w-20 flex-shrink-0">
+          <div className="time-gutter w-16 flex-shrink-0">
             {hours.map((hour) => (
-              <div key={hour} className="h-[50px] text-right pr-3 py-1 text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
-                {formatHour(hour)}
+              <div key={hour} className="relative h-[50px] pr-3">
+                <span className="time-label block pt-1 text-[10px]">{formatHour(hour)}</span>
+                <span className="time-tick time-tick-major absolute right-0 top-0" />
+                <span className="time-tick time-tick-minor absolute right-0 top-[25px]" />
               </div>
             ))}
           </div>
-          
-          {/* Day columns */}
           {days.map((day, dayIndex) => {
             const dayTasks = getTasksForDate(day);
             const positionedEvents = positionedEventsByDay[day.toString()] || [];
-            
             return (
-              <div key={dayIndex} className="flex-1 relative border-l border-gray-200">
-                {/* Hour grid lines */}
+              <div key={dayIndex} className="flex-1 relative border-l-2 border-gray-400">
                 {hours.map((hour) => {
                   const hourTasks = dayTasks.filter(t => getEventHour(t.dueDate) === hour);
                   return (
-                    <div 
-                      key={hour} 
-                      onClick={(e) => handleSlotClick(day, hour, e)}
-                      className="h-[50px] border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer"
-                    >
-                      {/* Tasks at this hour */}
+                    <div key={hour} onClick={(e) => { setPopupDate(`${day.toString()}T${hour.toString().padStart(2, '0')}:00`); setPopupPosition({ x: e.clientX, y: e.clientY }); setPopupOpen(true); }}
+                      className="h-[50px] border-b border-gray-300 bg-theme-secondary hover:bg-theme-tertiary transition-colors cursor-pointer">
                       {hourTasks.map(task => (
-                        <div
-                          key={task.id}
-                          onClick={(e) => handleTaskClick(task, e)}
-                          className={`text-xs px-1 py-0.5 mx-0.5 rounded truncate border-l-2 bg-gray-100 cursor-pointer hover:bg-gray-200 ${
-                            task.completed ? 'line-through text-gray-400' : 'text-gray-700'
-                          } ${
-                            task.priority === 'high' ? 'border-red-500' :
-                            task.priority === 'medium' ? 'border-yellow-500' : 'border-green-500'
-                          }`}
-                        >
-                          {task.title}
+                        <div key={task.id} onClick={(e) => { e.stopPropagation(); setEditingTask(task); setIsTaskModalOpen(true); }}
+                          className="task-compact mx-1 my-0.5 cursor-pointer" style={{ borderLeftColor: task.priority === 'high' ? 'var(--accent-red)' : task.priority === 'medium' ? 'var(--accent-yellow)' : 'var(--accent-green)' }}>
+                          <span className={task.completed ? 'line-through opacity-50' : ''}>{task.title}</span>
                         </div>
                       ))}
                     </div>
                   );
                 })}
-                
-                {/* Positioned events overlay */}
                 {positionedEvents.map(event => (
-                  <div
-                    key={event.id}
-                    onClick={(e) => handleEventClick(event, e)}
-                    className="absolute text-xs px-1 py-0.5 rounded text-white cursor-pointer hover:opacity-90 overflow-hidden"
-                    style={{
-                      backgroundColor: event.color,
-                      top: `${event.top}px`,
-                      height: `${event.height}px`,
-                      left: `${event.left}%`,
-                      width: `calc(${event.width}% - 2px)`,
-                      marginLeft: '1px',
-                    }}
-                  >
-                    <div className="font-medium truncate text-[10px]">{event.title}</div>
-                    {event.height > 30 && (
-                      <div className="text-[9px] opacity-80 truncate">
-                        {new Date(event.startDate).toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })}
-                      </div>
-                    )}
+                  <div key={event.id} onClick={(e) => { e.stopPropagation(); setEditingEvent(event); setIsEventModalOpen(true); }}
+                    className="event-block absolute text-white cursor-pointer text-[10px]" style={{ backgroundColor: event.color, top: `${event.top}px`, height: `${event.height}px`, left: `${event.left}%`, width: `calc(${event.width}% - 4px)`, marginLeft: '2px', padding: '4px 6px' }}>
+                    <div className="font-medium truncate">{event.title}</div>
+                    {event.height > 30 && <div className="text-[9px] opacity-80 truncate">{new Date(event.startDate).toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })}</div>}
                   </div>
                 ))}
               </div>
@@ -512,180 +268,61 @@ function WeekView() {
   );
 }
 
-
-// Month View Component
+// Month View
 function MonthView() {
-  const {
-    displayedDate,
-    events,
-    tasks,
-    setIsEventModalOpen,
-    setIsTaskModalOpen,
-    setEditingEvent,
-    setEditingTask,
-    setSelectedDate,
-  } = useCalendar();
+  const { displayedDate, events, tasks, setIsEventModalOpen, setIsTaskModalOpen, setEditingEvent, setEditingTask, setSelectedDate } = useCalendar();
   const [monthCalendar, setMonthCalendar] = useState<{ date: Temporal.PlainDate; isInMonth: boolean }[]>([]);
   const today = Temporal.Now.plainDateISO();
-  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const weekDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
   const [popupOpen, setPopupOpen] = useState(false);
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
   const [popupDate, setPopupDate] = useState('');
 
   useEffect(() => {
-    const fiveWeeks = 5 * 7;
-    const sixWeeks = 6 * 7;
-    const startOfMonth = Temporal.PlainDate.from({ 
-      year: displayedDate.year, 
-      month: displayedDate.month, 
-      day: 1 
-    });
+    const startOfMonth = Temporal.PlainDate.from({ year: displayedDate.year, month: displayedDate.month, day: 1 });
     const monthLength = startOfMonth.daysInMonth;
     const dayOfWeekMonthStartedOn = startOfMonth.dayOfWeek - 1;
-    
-    const length = dayOfWeekMonthStartedOn + monthLength > fiveWeeks ? sixWeeks : fiveWeeks;
-
-    const calendar = new Array(length)
-      .fill({})
-      .map((_, index) => {
-        const date = startOfMonth.add({ days: index - dayOfWeekMonthStartedOn });
-        return {
-          isInMonth: !(index < dayOfWeekMonthStartedOn || index - dayOfWeekMonthStartedOn >= monthLength),
-          date,
-        };
-      });
-
+    const length = dayOfWeekMonthStartedOn + monthLength > 35 ? 42 : 35;
+    const calendar = new Array(length).fill({}).map((_, index) => {
+      const date = startOfMonth.add({ days: index - dayOfWeekMonthStartedOn });
+      return { isInMonth: !(index < dayOfWeekMonthStartedOn || index - dayOfWeekMonthStartedOn >= monthLength), date };
+    });
     setMonthCalendar(calendar);
   }, [displayedDate]);
 
-  const getEventsForDate = (date: Temporal.PlainDate) => {
-    return events.filter(event => event.startDate.slice(0, 10) === date.toString());
-  };
+  const getEventsForDate = (date: Temporal.PlainDate) => events.filter(event => event.startDate.slice(0, 10) === date.toString());
+  const getTasksForDate = (date: Temporal.PlainDate) => tasks.filter(task => task.dueDate.slice(0, 10) === date.toString());
 
-  const getTasksForDate = (date: Temporal.PlainDate) => {
-    return tasks.filter(task => task.dueDate.slice(0, 10) === date.toString());
-  };
-
-  const handleDayClick = (date: Temporal.PlainDate, e: React.MouseEvent) => {
-    setPopupDate(date.toString());
-    setPopupPosition({ x: e.clientX, y: e.clientY });
-    setPopupOpen(true);
-  };
-
-  const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingEvent(event);
-    setIsEventModalOpen(true);
-  };
-
-  const handleTaskClick = (task: Task, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingTask(task);
-    setIsTaskModalOpen(true);
-  };
-
-  const handleCreateEvent = () => {
-    setSelectedDate(popupDate);
-    setEditingEvent(null);
-    setIsEventModalOpen(true);
-    setPopupOpen(false);
-  };
-
-  const handleCreateTask = () => {
-    setSelectedDate(popupDate);
-    setEditingTask(null);
-    setIsTaskModalOpen(true);
-    setPopupOpen(false);
-  };
   return (
-    
     <div className="flex flex-col h-full">
-      {popupOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setPopupOpen(false)} />
-          <div
-            className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[140px]"
-            style={{ left: popupPosition.x, top: popupPosition.y }}
-          >
-            <button
-              onClick={handleCreateEvent}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2"
-            >
-              <span className="w-3 h-3 rounded-full bg-blue-500" />
-              New Event
-            </button>
-            <button
-              onClick={handleCreateTask}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-green-50 flex items-center gap-2"
-            >
-              <span className="w-3 h-3 rounded-full bg-green-500" />
-              New Task
-            </button>
-          </div>
-        </>
-      )}
-
-      {/* Weekday headers */}
-      <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
-        {weekDays.map((day) => (
-          <div key={day} className="py-3 text-center text-sm font-medium text-gray-600">
-            {day}
-          </div>
-        ))}
+      <CreatePopup isOpen={popupOpen} position={popupPosition} onClose={() => setPopupOpen(false)}
+        onCreateEvent={() => { setSelectedDate(popupDate); setEditingEvent(null); setIsEventModalOpen(true); setPopupOpen(false); }}
+        onCreateTask={() => { setSelectedDate(popupDate); setEditingTask(null); setIsTaskModalOpen(true); setPopupOpen(false); }}
+      />
+      <div className="view-header grid grid-cols-7 border-b-4 border-gray-700">
+        {weekDays.map((day) => <div key={day} className="py-3 text-center"><span className="view-header-day text-xs tracking-widest">{day}</span></div>)}
       </div>
-      
-      {/* Calendar grid */}
-      <div className="grid grid-cols-7 flex-1">
+      <div className="grid grid-cols-7 flex-1 gap-1 p-2 bg-gray-400">
         {monthCalendar.map((day, index) => {
           const isToday = day.date.equals(today);
           const dayEvents = getEventsForDate(day.date);
           const dayTasks = getTasksForDate(day.date);
-          
           return (
-            <div
-              key={index}
-              onClick={(e) => handleDayClick(day.date, e)}
-              className={`border-b border-r border-gray-100 p-2 min-h-[80px] hover:bg-blue-50 transition-colors cursor-pointer
-                ${day.isInMonth ? 'bg-white' : 'bg-gray-50'}`}
-            >
-              <span className={`inline-flex items-center justify-center w-7 h-7 text-sm
-                ${isToday ? 'bg-blue-500 text-white rounded-full' : ''}
-                ${!day.isInMonth ? 'text-gray-400' : 'text-gray-700'}`}
-              >
-                {day.date.day}
-              </span>
-              
-              {/* Events and Tasks */}
-              <div className="mt-1 space-y-1">
+            <div key={index} onClick={(e) => { setPopupDate(day.date.toString()); setPopupPosition({ x: e.clientX, y: e.clientY }); setPopupOpen(true); }}
+              className={`calendar-cell p-2 min-h-[90px] cursor-pointer ${!day.isInMonth ? 'calendar-cell-inactive' : ''} ${isToday ? 'calendar-today' : ''}`}>
+              <span className={`day-badge text-sm ${isToday ? 'day-badge-today' : ''} ${!day.isInMonth ? 'opacity-40' : ''}`}>{day.date.day}</span>
+              <div className="mt-2 space-y-1">
                 {dayEvents.slice(0, 2).map(event => (
-                  <div
-                    key={event.id}
-                    onClick={(e) => handleEventClick(event, e)}
-                    className="text-xs px-1 py-0.5 rounded truncate text-white cursor-pointer hover:opacity-80"
-                    style={{ backgroundColor: event.color }}
-                  >
-                    {event.title}
-                  </div>
+                  <div key={event.id} onClick={(e) => { e.stopPropagation(); setEditingEvent(event); setIsEventModalOpen(true); }}
+                    className="event-chip text-white truncate cursor-pointer hover:opacity-90" style={{ backgroundColor: event.color }}>{event.title}</div>
                 ))}
                 {dayTasks.slice(0, 2).map(task => (
-                  <div
-                    key={task.id}
-                    onClick={(e) => handleTaskClick(task, e)}
-                    className={`text-xs px-1 py-0.5 rounded truncate border-l-2 bg-gray-100 cursor-pointer hover:bg-gray-200 ${
-                      task.completed ? 'line-through text-gray-400' : 'text-gray-700'
-                    } ${
-                      task.priority === 'high' ? 'border-red-500' :
-                      task.priority === 'medium' ? 'border-yellow-500' : 'border-green-500'
-                    }`}
-                  >
-                    {task.title}
+                  <div key={task.id} onClick={(e) => { e.stopPropagation(); setEditingTask(task); setIsTaskModalOpen(true); }}
+                    className="task-chip cursor-pointer hover:bg-theme-secondary" style={{ borderLeftColor: task.priority === 'high' ? 'var(--accent-red)' : task.priority === 'medium' ? 'var(--accent-yellow)' : 'var(--accent-green)' }}>
+                    <span className={task.completed ? 'line-through opacity-50' : ''}>{task.title}</span>
                   </div>
                 ))}
-                {(dayEvents.length + dayTasks.length) > 4 && (
-                  <div className="text-xs text-gray-500">
-                    +{dayEvents.length + dayTasks.length - 4} more
-                  </div>
-                )}
+                {(dayEvents.length + dayTasks.length) > 4 && <div className="text-[9px] text-theme-muted font-mono">+{dayEvents.length + dayTasks.length - 4} more</div>}
               </div>
             </div>
           );
@@ -694,87 +331,39 @@ function MonthView() {
     </div>
   );
 }
-// Year View Component
+
+// Year View
 function YearView() {
   const { displayedDate, setDisplayedDate, setView } = useCalendar();
   const today = Temporal.Now.plainDateISO();
-  
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
+  const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
   const getMiniCalendar = (month: number) => {
-    const startOfMonth = Temporal.PlainDate.from({ 
-      year: displayedDate.year, 
-      month, 
-      day: 1 
-    });
+    const startOfMonth = Temporal.PlainDate.from({ year: displayedDate.year, month, day: 1 });
     const monthLength = startOfMonth.daysInMonth;
     const dayOfWeekMonthStartedOn = startOfMonth.dayOfWeek - 1;
-    
     const calendar: (number | null)[] = [];
-    
-    // Add empty cells for days before month starts
-    for (let i = 0; i < dayOfWeekMonthStartedOn; i++) {
-      calendar.push(null);
-    }
-    
-    // Add days of month
-    for (let day = 1; day <= monthLength; day++) {
-      calendar.push(day);
-    }
-    
+    for (let i = 0; i < dayOfWeekMonthStartedOn; i++) calendar.push(null);
+    for (let day = 1; day <= monthLength; day++) calendar.push(day);
     return calendar;
   };
 
-  const handleMonthClick = (month: number) => {
-    setDisplayedDate(Temporal.PlainDate.from({ 
-      year: displayedDate.year, 
-      month, 
-      day: 1 
-    }));
-    setView('month');
-  };
-
   return (
-    <div className="grid grid-cols-3 md:grid-cols-4 gap-4 p-4 overflow-y-auto h-full">
+    <div className="grid grid-cols-3 md:grid-cols-4 gap-4 p-4 overflow-y-auto h-full bg-theme-secondary">
       {monthNames.map((monthName, index) => {
         const month = index + 1;
         const miniCalendar = getMiniCalendar(month);
         const isCurrentMonth = today.year === displayedDate.year && today.month === month;
-        
         return (
-          <div 
-            key={monthName} 
-            className={`bg-white border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow
-              ${isCurrentMonth ? 'border-blue-500 border-2' : 'border-gray-200'}`}
-            onClick={() => handleMonthClick(month)}
-          >
-            <h3 className={`text-sm font-semibold mb-2 ${isCurrentMonth ? 'text-blue-600' : 'text-gray-700'}`}>
-              {monthName}
-            </h3>
-            <div className="grid grid-cols-7 gap-px text-xs h-full">
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-                <div key={i} className="text-center text-gray-400 font-medium">
-                  {d}
-                </div>
-              ))}
+          <div key={monthName} onClick={() => { setDisplayedDate(Temporal.PlainDate.from({ year: displayedDate.year, month, day: 1 })); setView('month'); }}
+            className={`panel-retro cursor-pointer hover:scale-[1.02] transition-transform ${isCurrentMonth ? 'ring-2 ring-amber-500' : ''}`}
+            style={isCurrentMonth ? { boxShadow: '0 0 20px rgba(255, 176, 0, 0.3)' } : {}}>
+            <h3 className={`text-sm font-display font-bold mb-3 tracking-widest ${isCurrentMonth ? 'text-amber-600' : 'text-theme-primary'}`}>{monthName}</h3>
+            <div className="grid grid-cols-7 gap-px text-[10px]">
+              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <div key={i} className="text-center text-theme-muted font-mono">{d}</div>)}
               {miniCalendar.map((day, i) => {
-                const isToday = day !== null && 
-                  today.year === displayedDate.year && 
-                  today.month === month && 
-                  today.day === day;
-                return (
-                  <div 
-                    key={i} 
-                    className={`text-center py-0.5
-                      ${day === null ? '' : 'text-gray-600'}
-                      ${isToday ? 'bg-blue-500 text-white rounded-full' : ''}`}
-                  >
-                    {day}
-                  </div>
-                );
+                const isToday = day !== null && today.year === displayedDate.year && today.month === month && today.day === day;
+                return <div key={i} className={`text-center py-0.5 font-mono ${day === null ? '' : 'text-theme-secondary'} ${isToday ? 'day-badge-today rounded-full' : ''}`}>{day}</div>;
               })}
             </div>
           </div>
@@ -784,119 +373,61 @@ function YearView() {
   );
 }
 
-// Main Calendar Component
+// Main Calendar
 function Calendar() {
   const { view } = useCalendar();
-
   const renderView = () => {
     switch (view) {
-      case 'day':
-        return <DayView />;
-      case 'week':
-        return <WeekView />;
-      case 'month':
-        return <MonthView />;
-      case 'year':
-        return <YearView />;
-      default:
-        return <MonthView />;
+      case 'day': return <DayView />;
+      case 'week': return <WeekView />;
+      case 'month': return <MonthView />;
+      case 'year': return <YearView />;
+      default: return <MonthView />;
     }
   };
-
-  return (
-    <div className="flex flex-col h-full">
-      {renderView()}
-    </div>
-  );
+  return <div className="flex flex-col h-full">{renderView()}</div>;
 }
 
-// Recall Button Component
+// Recall Button
 function RecallButton() {
   const { displayedDate, view, goToToday } = useCalendar();
-  
-  const monthNames = [
-    '', 'January', 'February', 'March', 'April', 'May', 'June', 
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
+  const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const getDisplayValue = () => {
     switch (view) {
-      case 'year':
-        return 'Today';
-      case 'month':
-        return `${monthNames[displayedDate.month]} ${displayedDate.year}`;
-      case 'week':
-        return `${monthNames[displayedDate.month]} ${displayedDate.year}`;
-      case 'day':
-        return `${monthNames[displayedDate.month]} ${displayedDate.day}, ${displayedDate.year}`;
-      default:
-        return `${monthNames[displayedDate.month]} ${displayedDate.year}`;
+      case 'year': return 'TODAY';
+      case 'month': return `${monthNames[displayedDate.month]} ${displayedDate.year}`;
+      case 'week': return `${monthNames[displayedDate.month]} ${displayedDate.year}`;
+      case 'day': return `${monthNames[displayedDate.month]} ${displayedDate.day}, ${displayedDate.year}`;
+      default: return `${monthNames[displayedDate.month]} ${displayedDate.year}`;
     }
   };
-
-  return (
-    <button 
-      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
-      onClick={goToToday}
-    >
-      {getDisplayValue()}
-    </button>
-  );
+  return <button className="display-readout text-sm tracking-wider" onClick={goToToday}>{getDisplayValue()}</button>;
 }
 
-// View Toggle Component
+// View Toggle
 function ViewToggle() {
   const { view, setView } = useCalendar();
   const views: Array<{ key: 'day' | 'week' | 'month' | 'year'; label: string }> = [
-    { key: 'day', label: 'Day' },
-    { key: 'week', label: 'Week' },
-    { key: 'month', label: 'Month' },
-    { key: 'year', label: 'Year' },
+    { key: 'day', label: 'DAY' }, { key: 'week', label: 'WEEK' }, { key: 'month', label: 'MONTH' }, { key: 'year', label: 'YEAR' }
   ];
-
   return (
-    <div className="flex bg-gray-100 rounded-lg p-1">
+    <div className="toggle-group">
       {views.map(({ key, label }) => (
-        <button
-          key={key}
-          className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors
-            ${view === key 
-              ? 'bg-white text-blue-600 shadow-sm' 
-              : 'text-gray-600 hover:text-gray-900'}`}
-          onClick={() => setView(key)}
-        >
-          {label}
-        </button>
+        <button key={key} className={`toggle-option ${view === key ? 'active' : ''}`} onClick={() => setView(key)}>{label}</button>
       ))}
     </div>
   );
 }
 
-// Navigation Buttons Component
+// Navigation Buttons
 function NavigationButtons() {
   const { next, previous } = useCalendar();
-
   return (
-    <div className="flex gap-1">
-      <button 
-        className="px-3 py-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600"
-        onClick={previous}
-      >
-        ‹
-      </button>
-      <button 
-        className="px-3 py-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600"
-        onClick={next}
-      >
-        ›
-      </button>
+    <div className="flex gap-2">
+      <button className="btn-capsule w-10 h-10 flex items-center text-3xl justify-center" onClick={previous}><ChevronLeft size={20} /> &lt;</button>
+      <button className="btn-capsule w-10 h-10 flex items-center text-3xl justify-center" onClick={next}><ChevronRight size={20} />&gt;</button>
     </div>
   );
-}
-
-function dayClickHandler(date: Temporal.PlainDate) {
-    console.log("Clicked date:", date.toString());
-    // When month or year, if clicked, displays popup to show event of that date (empty, update)
 }
 
 export { Calendar, RecallButton, ViewToggle, NavigationButtons };

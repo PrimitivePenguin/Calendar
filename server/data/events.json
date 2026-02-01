@@ -14,22 +14,33 @@
     "id": "33b33a91-9194-4d21-8b37-0d9e3072ed0a",
     "title": "Hackathon ends",
     "description": "I'm free of my suffering\n",
-    "startDate": "2026-02-01T14:00:00.000Z",
-    "endDate": "2026-02-01T20:00:00.000Z",
+    "startDate": "2026-02-01T14:00:00Z",
+    "endDate": "2026-02-01T20:00:00Z",
     "allDay": false,
-    "color": "#3788d8",
+    "color": "var(--accent-red)",
     "createdAt": "2026-02-01T14:06:23.240Z",
-    "updatedAt": "2026-02-01T14:06:23.240Z"
+    "updatedAt": "2026-02-01T16:57:15.027Z"
   },
   {
     "id": "2db27198-a418-47b0-98f8-1aa1038aad74",
     "title": "sleep? Please??",
     "description": "",
-    "startDate": "2026-02-01T17:00:00.000Z",
-    "endDate": "2026-02-01T18:00:00.000Z",
+    "startDate": "2026-02-02T01:00:00.000Z",
+    "endDate": "2026-02-02T02:00:00.000Z",
+    "allDay": false,
+    "color": "#ff7f50",
+    "createdAt": "2026-02-01T14:24:40.654Z",
+    "updatedAt": "2026-02-01T14:59:01.964Z"
+  },
+  {
+    "id": "6f99ab56-5ece-4ad5-836d-db16e219d2ad",
+    "title": "a",
+    "description": "",
+    "startDate": "2026-02-02T17:00:00Z",
+    "endDate": "2026-02-03T19:00:00Z",
     "allDay": false,
     "color": "#ffd93d",
-    "createdAt": "2026-02-01T14:24:40.654Z",
-    "updatedAt": "2026-02-01T14:24:40.654Z"
+    "createdAt": "2026-02-01T14:59:35.900Z",
+    "updatedAt": "2026-02-01T15:25:00.639Z"
   }
 ]

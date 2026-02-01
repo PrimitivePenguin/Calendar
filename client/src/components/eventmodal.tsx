@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Zap } from 'lucide-react';
 import { useCalendar } from '../context/calendarcontext';
+import { toLocalDateTimeString, toISOString } from '../config/timezone';
 
 const EventModal = () => {
   const {
@@ -21,14 +22,20 @@ const EventModal = () => {
   const [allDay, setAllDay] = useState(false);
   const [color, setColor] = useState('#3788d8');
 
-  const colors = ['#3788d8', '#ff7f50', '#32cd32', '#9370db', '#ff6b6b', '#ffd93d'];
+  const colors = [
+    { name: 'blue', value: 'var(--accent-blue)', label: 'BLUE' },
+    { name: 'green', value: 'var(--accent-green)', label: 'GRN' },
+    { name: 'red', value: 'var(--accent-red)', label: 'RED' },
+    { name: 'yellow', value: 'var(--accent-yellow)', label: 'YLW' },
+    { name: 'purple', value: 'var(--accent-purple)', label: 'PRP' },
+  ];
 
   useEffect(() => {
     if (editingEvent) {
       setTitle(editingEvent.title);
       setDescription(editingEvent.description);
-      setStartDate(editingEvent.startDate.slice(0, 16));
-      setEndDate(editingEvent.endDate.slice(0, 16));
+      setStartDate(toLocalDateTimeString(editingEvent.startDate));
+      setEndDate(toLocalDateTimeString(editingEvent.endDate));
       setAllDay(editingEvent.allDay);
       setColor(editingEvent.color);
     } else if (selectedDate) {
@@ -44,7 +51,7 @@ const EventModal = () => {
     setTitle('');
     setDescription('');
     setAllDay(false);
-    setColor('#3788d8');
+    setColor('var(--accent-blue)');
   };
 
   const resetForm = () => {
@@ -53,7 +60,7 @@ const EventModal = () => {
     setStartDate('');
     setEndDate('');
     setAllDay(false);
-    setColor('#3788d8');
+    setColor('var(--accent-blue)');
   };
 
   const handleClose = () => {
@@ -68,8 +75,8 @@ const EventModal = () => {
     const eventData = {
       title,
       description,
-      startDate: new Date(startDate).toISOString(),
-      endDate: new Date(endDate).toISOString(),
+      startDate: toISOString(startDate),
+      endDate: toISOString(endDate),
       allDay,
       color,
     };
@@ -84,7 +91,7 @@ const EventModal = () => {
   };
 
   const handleDelete = async () => {
-    if (editingEvent && confirm('Are you sure you want to delete this event?')) {
+    if (editingEvent && window.confirm('Are you sure you want to delete this event?')) {
       await deleteEvent(editingEvent.id);
       handleClose();
     }
@@ -93,108 +100,146 @@ const EventModal = () => {
   if (!isEventModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">
-            {editingEvent ? 'Edit Event' : 'New Event'}
-          </h2>
-          <button onClick={handleClose} className="p-1 hover:bg-gray-100 rounded">
-            <X size={20} />
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="modal-retro w-full max-w-md mx-4 relative">
+        {/* Decorative corner rivets */}
+        <div className="absolute top-4 left-4 w-3 h-3 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 border-2 border-gray-700 z-10" />
+        <div className="absolute top-4 right-4 w-3 h-3 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 border-2 border-gray-700 z-10" />
+        <div className="absolute bottom-4 left-4 w-3 h-3 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 border-2 border-gray-700 z-10" />
+        <div className="absolute bottom-4 right-4 w-3 h-3 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 border-2 border-gray-700 z-10" />
+
+        {/* Header */}
+        <div className="modal-retro-header flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="status-light status-blue status-light-on" />
+            <h2 className="text-lg">
+              {editingEvent ? 'Edit Event' : 'New Event'}
+            </h2>
+          </div>
+          <button 
+            onClick={handleClose} 
+            className="w-8 h-8 rounded-lg bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-colors border-2 border-gray-500"
+          >
+            <X size={16} className="text-gray-300" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Title Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Title *
+            <label className="block text-xs font-display tracking-widest text-theme-secondary mb-2 uppercase">
+              Event Title <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Event title"
+              className="input-retro w-full"
+              placeholder="ENTER MISSION NAME..."
             />
           </div>
 
+          {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-display tracking-widest text-theme-secondary mb-2 uppercase">
               Description
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Event description"
+              className="input-retro w-full resize-none"
+              placeholder="MISSION DETAILS..."
               rows={3}
             />
           </div>
 
+          {/* Date/Time Grid */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Start *
+              <label className="block text-xs font-display tracking-widest text-theme-secondary mb-2 uppercase">
+                Launch <span className="text-red-500">*</span>
               </label>
               <input
                 type="datetime-local"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input-retro w-full text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                End *
+              <label className="block text-xs font-display tracking-widest text-theme-secondary mb-2 uppercase">
+                End <span className="text-red-500">*</span>
               </label>
               <input
                 type="datetime-local"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input-retro w-full text-sm"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="allDay"
-              checked={allDay}
-              onChange={(e) => setAllDay(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded"
-            />
-            <label htmlFor="allDay" className="text-sm text-gray-700">
-              All day event
+          {/* All Day Toggle */}
+          <div className="flex items-center gap-3 p-3 border-inset rounded-xl bg-gray-100">
+            <button
+              type="button"
+              onClick={() => setAllDay(!allDay)}
+              className={`w-12 h-7 rounded-full transition-all duration-200 relative ${
+                allDay 
+                  ? 'bg-gradient-to-b from-amber-400 to-amber-600' 
+                  : 'bg-gray-400'
+              }`}
+              style={allDay ? { boxShadow: '0 0 12px rgba(255, 176, 0, 0.5)' } : {}}
+            >
+              <div className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-200 ${
+                allDay ? 'left-6' : 'left-1'
+              }`} />
+            </button>
+            <label className="text-sm font-body text-theme-primary">
+              All Day Event
             </label>
           </div>
 
+          {/* Color Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Color
+            <label className="block text-xs font-display tracking-widest text-theme-secondary mb-3 uppercase">
+              Color Code
             </label>
             <div className="flex gap-2">
               {colors.map((c) => (
                 <button
-                  key={c}
+                  key={c.name}
                   type="button"
-                  onClick={() => setColor(c)}
-                  className={`w-8 h-8 rounded-full ${color === c ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}
-                  style={{ backgroundColor: c }}
-                />
+                  onClick={() => setColor(c.value)}
+                  className={`flex-1 py-3 rounded-xl border-3 transition-all duration-150 flex flex-col items-center gap-1 ${
+                    color === c.value 
+                      ? 'border-white shadow-lg scale-105' 
+                      : 'border-transparent opacity-70 hover:opacity-100'
+                  }`}
+                  style={{ 
+                    backgroundColor: c.value,
+                    boxShadow: color === c.value ? `0 0 15px ${c.value}40` : 'none'
+                  }}
+                >
+                  <div className={`w-4 h-4 rounded-full border-2 border-white/50 ${
+                    color === c.value ? 'bg-white' : 'bg-transparent'
+                  }`} />
+                  <span className="text-[10px] font-mono text-white/80">{c.label}</span>
+                </button>
               ))}
             </div>
           </div>
 
-          <div className="flex gap-2 pt-4">
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4 border-t-2 border-gray-300">
             {editingEvent && (
               <button
                 type="button"
                 onClick={handleDelete}
-                className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-md"
+                className="btn-retro text-sm bg-gradient-to-b from-red-100 to-red-200 text-red-700 border-red-400 hover:from-red-200 hover:to-red-300"
               >
                 Delete
               </button>
@@ -203,15 +248,16 @@ const EventModal = () => {
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md"
+              className="btn-capsule"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+              className="btn-retro btn-retro-active flex items-center gap-2"
             >
-              {editingEvent ? 'Update' : 'Create'}
+              <Zap size={14} />
+              {editingEvent ? 'Update' : 'Launch'}
             </button>
           </div>
         </form>

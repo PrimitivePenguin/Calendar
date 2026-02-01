@@ -128,19 +128,35 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateEvent = async (id: string, event: Partial<CalendarEvent>) => {
-    try {
-      const res = await fetch(`${API_BASE}/events/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(event),
-      });
-      const updatedEvent = await res.json();
-      setEvents(prev => prev.map(e => e.id === id ? updatedEvent : e));
-    } catch (error) {
-      console.error('Failed to update event:', error);
+ const updateEvent = async (id: string, event: Partial<CalendarEvent>) => {
+  try {
+    const res = await fetch(`${API_BASE}/events/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    });
+    
+    if (!res.ok) {
+      const error = await res.json();
+      console.error('Update failed:', error);
+      return;
     }
-  };
+    
+    const updatedEvent = await res.json();
+    console.log('Updated event:', updatedEvent); // Debug log
+    
+    // Make sure we have a valid event with an id
+    if (updatedEvent && updatedEvent.id) {
+      setEvents(prev => prev.map(e => e.id === id ? updatedEvent : e));
+    } else {
+      // If server doesn't return the full event, refetch all events
+      await fetchEvents();
+    }
+  } catch (error) {
+    console.error('Failed to update event:', error);
+  }
+};
+
 
   const deleteEvent = async (id: string) => {
     try {
