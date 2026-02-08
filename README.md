@@ -1,3 +1,6 @@
+Devpost link for XHacks 2026
+https://devpost.com/software/ad-astra-future-of-calendar
+
 Installation:
 1. run "npm -i" in client folder
 2. run "npm -i" in server folder
